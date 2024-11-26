@@ -205,13 +205,13 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hide-py", specifier = ">=0.5.2" },
+    { name = "hide-py", specifier = ">=0.5.3" },
     { name = "mcp", specifier = ">=1.0.0" },
 ]
 
 [[package]]
 name = "hide-py"
-version = "0.5.2"
+version = "0.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain" },
@@ -221,9 +221,9 @@ dependencies = [
     { name = "pyjson5" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/65/8b/7f8e14403e5ee8ee3ae67d2952b8214647ee41141beec1f0f824e26da28d/hide_py-0.5.2.tar.gz", hash = "sha256:6302ba09646e75ad6c7ffd3c7d53b870fcafd3f087978289c951029b7b51960a", size = 12768 }
+sdist = { url = "https://files.pythonhosted.org/packages/16/4c/d838533fdce36a0f9d49a69d1737bac8ec8c93524ad1b95019c1bc8e4209/hide_py-0.5.3.tar.gz", hash = "sha256:cd9c4f7db8fff026f4e25ab52155cf1956b2c787f863facb65e918efee2208e9", size = 12846 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/6d/aded11d0f9fd3bf16e8412c005f15ebe3b56cc18ed67ebd28527d60c5531/hide_py-0.5.2-py3-none-any.whl", hash = "sha256:52d5a844fbae0828f06b3ce5aba2b092490880049aef73c54f9e8253644fe479", size = 14106 },
+    { url = "https://files.pythonhosted.org/packages/c1/bb/b3c7f06230703039c9fc0aeb118cfe00c0a12cbdc6309ecd1c374406aacd/hide_py-0.5.3-py3-none-any.whl", hash = "sha256:0882fb528fb06a264f6183ceb8ea82c21d8c1f84bebf5da576f235ae9ac895f4", size = 14149 },
 ]
 
 [[package]]

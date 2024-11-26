@@ -4,29 +4,46 @@ A MCP server for Hide
 
 ## Components
 
-### Resources
-
-The server implements a simple note storage system with:
-- Custom note:// URI scheme for accessing individual notes
-- Each note resource has a name, description and text/plain mimetype
-
-### Prompts
-
-The server provides a single prompt:
-- summarize-notes: Creates summaries of all stored notes
-  - Optional "style" argument to control detail level (brief/detailed)
-  - Generates prompt combining all current notes with style preference
-
 ### Tools
 
-The server implements one tool:
-- add-note: Adds a new note to the server
-  - Takes "name" and "content" as required string arguments
-  - Updates server state and notifies clients of resource changes
+The server implements several tools for interacting with Hide projects:
 
-## Configuration
+- list_tasks: Lists available tasks in the project
+  - Takes no arguments
+  - Returns list of tasks with their aliases and commands
 
-[TODO: Add configuration details specific to your implementation]
+- run_task: Executes a task in the project
+  - Takes either "command" or "alias" as required string argument
+  - Optional "timeout" integer argument in seconds
+  - Returns task execution results including exit code, stdout and stderr
+
+- create_file: Creates a new file in the project
+  - Takes "path" and "content" as required string arguments
+  - Returns details of created file
+
+- insert_lines: Inserts lines at a specific position in a file
+  - Takes "path", "start_line" (1-indexed), and "content" as required arguments
+  - Returns details of updated file
+
+- replace_lines: Replaces lines between start and end positions in a file
+  - Takes "path", "start_line", "end_line" (1-indexed), and "content" as required arguments
+  - Returns details of updated file
+
+- append_lines: Appends lines to end of a file
+  - Takes "path" and "content" as required string arguments
+  - Returns details of updated file
+
+- get_file: Reads contents of a file
+  - Takes "path" as required string argument
+  - Returns file contents
+
+- delete_file: Removes a file from the project
+  - Takes "path" as required string argument
+  - Returns deletion status
+
+- list_files: Lists all files in the project
+  - Takes no arguments
+  - Returns tree view of project files
 
 ## Quickstart
 
@@ -45,7 +62,7 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/artemm/Code/hide-mcp",
+        "/path/to/hide-mcp",
         "run",
         "hide-mcp"
       ]
@@ -104,7 +121,7 @@ experience, we strongly recommend using the [MCP Inspector](https://github.com/m
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
-npx @modelcontextprotocol/inspector uv --directory /Users/artemm/Code/hide-mcp run hide-mcp
+npx @modelcontextprotocol/inspector uv --directory /path/to/hide-mcp run hide-mcp
 ```
 
 

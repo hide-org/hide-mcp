@@ -5,7 +5,7 @@ description = "A MCP server for Hide"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
- "hide-py>=0.5.2",
+ "hide-py>=0.5.3",
  "mcp>=1.0.0",
 ]
 

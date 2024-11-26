@@ -3,32 +3,51 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 import hide
 from hide import model
+from pydantic import AnyUrl
 
-# Store Hide client and active projects
+# Store Hide client
 client = hide.Client()
-# projects: dict[str, model.Project] = {}
 
 server = Server("hide-mcp")
 
-PROJECT_ID = "FILL ME"  # default Hide project ID to use
+# Project ID is set when a client reads resource
+PROJECT_ID = None
 
-# @server.list_resources()
-# async def handle_list_resources() -> list[types.Resource]:
-#     """
-#     List available Hide projects as resources.
-#     Each project is exposed as a resource with a hide:// URI scheme.
-#     """
-#     resources = []
-#     for project_id, project in projects.items():
-#         resources.append(
-#             types.Resource(
-#                 uri=AnyUrl(f"hide://projects/{project_id}"),
-#                 name=f"Project: {project_id}",
-#                 description=f"Hide project from {project.repository.url}",
-#                 # mimeType="application/x-hide-project",
-#             )
-#         )
-#     return resources
+@server.list_resources()
+async def handle_list_resources() -> list[types.Resource]:
+    """
+    List available Hide projects as resources.
+    Each project is exposed as a resource with a hide:// URI scheme.
+    """
+    resources = []
+    for project in client.get_projects():
+        resources.append(
+            types.Resource(
+                uri=AnyUrl(f"hide://projects/{project.id}"),
+                name=f"Hide project from {project.repository.url}",
+                description=f"Hide project from {project.repository.url}",
+                # mimeType="application/x-hide-project",
+            )
+        )
+    return resources
+
+
+@server.read_resource()
+async def read_resource(uri: AnyUrl) -> str:
+    """Read a Hide project."""
+    global PROJECT_ID
+    if str(uri).startswith("hide://projects/"):
+        project_id = str(uri).split("/")[-1]
+    else:
+        raise ValueError(f"Unknown resource: {uri}")
+
+    try:
+        project = client.get_project(project_id)
+        PROJECT_ID = project_id
+        return f"This project is powered by Hide, a headless IDE for coding agents. Docs at hide.sh.\n\nProject: {project.id}\nRepository: {project.repository.url}"
+    except Exception as e:
+        raise RuntimeError(f"Error reading project: {str(e)}")
+
 
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
@@ -152,6 +171,9 @@ async def handle_call_tool(
     """
     Handle tool execution requests for Hide operations.
     """
+    if not PROJECT_ID:
+        raise ValueError("No project ID set. Please select a project resource first.")
+    
     if not arguments:
         arguments = {}
 
