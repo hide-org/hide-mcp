@@ -24,7 +24,7 @@ async def handle_list_resources() -> list[types.Resource]:
         resources.append(
             types.Resource(
                 uri=AnyUrl(f"hide://projects/{project.id}"),
-                name=f"Hide project from {project.repository.url}",
+                name=f"{project.id} ({project.repository.url})",
                 description=f"Hide project from {project.repository.url}",
                 # mimeType="application/x-hide-project",
             )
@@ -81,7 +81,7 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
-            name="create_file",
+            name="create_project_file",
             description="Create a new file in the project",
             inputSchema={
                 "type": "object",
@@ -143,7 +143,7 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
-            name="delete_file",
+            name="delete_project_file",
             description="Delete a file from the project",
             inputSchema={
                 "type": "object",
@@ -196,7 +196,7 @@ async def handle_call_tool(
             )
             return [types.TextContent(type="text", text=f"Task exited with code {result.exit_code}\nTask stdout:\n{result.stdout}\nTask stderr:\n{result.stderr}")]
 
-        case "create_file":
+        case "create_project_file":
             path = arguments["path"]
             content = arguments["content"]
 
@@ -255,7 +255,7 @@ async def handle_call_tool(
             file_content = client.get_file(project_id=PROJECT_ID, path=path)
             return [types.TextContent(type="text", text=str(file_content))]
 
-        case "delete_file":
+        case "delete_project_file":
             path = arguments["path"]
 
             deleted = client.delete_file(project_id=PROJECT_ID, file=path)
