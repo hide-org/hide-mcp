@@ -1,0 +1,22 @@
+[project]
+name = "hide-mcp"
+version = "0.1.0"
+description = "A MCP server for Hide"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+ "hide-py>=0.5.2",
+ "mcp>=1.0.0",
+]
+
+[build-system]
+requires = [ "hatchling",]
+build-backend = "hatchling.build"
+
+[project.scripts]
+hide-mcp = "hide_mcp:main"
+
+[tool.pyright]
+include = ["src"]
+venvPath = "."
+venv = ".venv"
