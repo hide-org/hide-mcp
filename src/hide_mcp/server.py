@@ -2,16 +2,23 @@ from mcp.server.models import InitializationOptions
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
 import hide
-from hide import model
 from pydantic import AnyUrl
+
+from hide_mcp.tools.base import ToolError, ToolResult
+from hide_mcp.tools.bash import BashTool
+from hide_mcp.tools.edit import EditTool
 
 # Store Hide client
 client = hide.Client()
 
 server = Server("hide-mcp")
 
+edit_tool = EditTool()
+bash_tool = BashTool()
+
 # Project ID is set when a client reads resource
 PROJECT_ID = None
+
 
 @server.list_resources()
 async def handle_list_resources() -> list[types.Resource]:
@@ -56,113 +63,17 @@ async def handle_list_tools() -> list[types.Tool]:
     """
     return [
         types.Tool(
-            name="list_tasks",
-            description="List the available tasks in the project.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
+            name=bash_tool.to_params()["name"],
+            description=bash_tool.to_params()["description"],
+            inputSchema=bash_tool.to_params()["inputSchema"],
         ),
         types.Tool(
-            name="run_task", 
-            description="Run a task in the project. Provide either command or alias. Set timeout in seconds. Command will be executed in the shell. For the list of available tasks and their aliases, use the `list_tasks` tool.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "command": {"type": "string"},
-                    "alias": {"type": "string"},
-                    "timeout": {"type": "integer"},
-                },
-                "oneOf": [
-                    {"required": ["command"]},
-                    {"required": ["alias"]}
-                ]
-            },
-        ),
-        types.Tool(
-            name="create_project_file",
-            description="Create a new file in the project",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "content": {"type": "string"},
-                },
-                "required": ["path", "content"],
-            },
-        ),
-        types.Tool(
-            name="insert_lines",
-            description="Insert lines at a specific position in a file. Lines are 1-indexed.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "start_line": {"type": "integer"},
-                    "content": {"type": "string"},
-                },
-                "required": ["path", "start_line", "content"],
-            },
-        ),
-        types.Tool(
-            name="replace_lines",
-            description="Replace lines in a file between start (inclusive) and end (exclusive) positions. Lines are 1-indexed.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "start_line": {"type": "integer"},
-                    "end_line": {"type": "integer"},
-                    "content": {"type": "string"},
-                },
-                "required": ["path", "start_line", "end_line", "content"],
-            },
-        ),
-        types.Tool(
-            name="append_lines",
-            description="Append lines to a file in the project",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "content": {"type": "string"},
-                },
-                "required": ["path", "content"],
-            },
-        ),
-        types.Tool(
-            name="get_file",
-            description="Read the contents of a file from the project",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                },
-                "required": ["path"],
-            },
-        ),
-        types.Tool(
-            name="delete_project_file",
-            description="Delete a file from the project",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                },
-                "required": ["path"],
-            },
-        ),
-        types.Tool(
-            name="list_files",
-            description="List all files in the project",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
+            name=edit_tool.to_params()["name"],
+            description=edit_tool.to_params()["description"],
+            inputSchema=edit_tool.to_params()["inputSchema"],
         ),
     ]
+
 
 @server.call_tool()
 async def handle_call_tool(
@@ -171,106 +82,38 @@ async def handle_call_tool(
     """
     Handle tool execution requests for Hide operations.
     """
-    if not PROJECT_ID:
-        raise ValueError("No project ID set. Please select a project resource first.")
-    
+    # if not PROJECT_ID:
+    #     raise ValueError("No project ID set. Please select a project resource first.")
+
     if not arguments:
         arguments = {}
 
     match name:
-        case "list_tasks":
-            tasks = client.get_tasks(project_id=PROJECT_ID)
-            task_list = "\n".join([f"- {task.alias}: {task.command}" for task in tasks])
-            return [types.TextContent(type="text", text=f"Available tasks:\n{task_list}")]
+        case edit_tool.name:
+            result = await edit_tool(**arguments)
+            if result.error:
+                result_text = _maybe_prepend_system_tool_result(result, result.error)
+                raise ToolError(result_text)
+            result_text = _maybe_prepend_system_tool_result(result, result.output or "")
+            return [types.TextContent(type="text", text=result_text)]
 
-        case "run_task":
-            command = arguments.get("command")
-            alias = arguments.get("alias")
-            timeout = arguments.get("timeout")
-
-            result = client.run_task(
-                project_id=PROJECT_ID,
-                command=command,
-                alias=alias,
-                timeout=timeout
-            )
-            return [types.TextContent(type="text", text=f"Task exited with code {result.exit_code}\nTask stdout:\n{result.stdout}\nTask stderr:\n{result.stderr}")]
-
-        case "create_project_file":
-            path = arguments["path"]
-            content = arguments["content"]
-
-            created_file = client.create_file(
-                project_id=PROJECT_ID,
-                path=path,
-                content=content
-            )
-            return [types.TextContent(type="text", text=f"File created successfully:\n{str(created_file)}")]
-
-        case "insert_lines":
-            path = arguments["path"]
-            start_line = arguments["start_line"]
-            content = arguments["content"]
-
-            file = client.get_file(project_id=PROJECT_ID, path=path)
-            file = file.insert_lines(start_line, content)
-            updated_file = client.update_file(
-                project_id=PROJECT_ID,
-                path=path,
-                update=model.OverwriteUpdate(content=file.content())
-            )
-            return [types.TextContent(type="text", text=f"Lines inserted successfully:\n{str(updated_file)}")]
-
-        case "replace_lines":
-            path = arguments["path"]
-            start_line = arguments["start_line"]
-            end_line = arguments["end_line"]
-            content = arguments["content"]
-
-            file = client.get_file(project_id=PROJECT_ID, path=path)
-            file = file.replace_lines(start_line, end_line, content)
-            updated_file = client.update_file(
-                project_id=PROJECT_ID,
-                path=path,
-                update=model.OverwriteUpdate(content=file.content())
-            )
-            return [types.TextContent(type="text", text=f"Lines replaced successfully:\n{str(updated_file)}")]
-
-        case "append_lines":
-            path = arguments["path"]
-            content = arguments["content"]
-
-            file = client.get_file(project_id=PROJECT_ID, path=path)
-            file = file.append_lines(content)
-            updated_file = client.update_file(
-                project_id=PROJECT_ID,
-                path=path,
-                update=model.OverwriteUpdate(content=file.content())
-            )
-            return [types.TextContent(type="text", text=f"Lines appended to {path} successfully\n{str(updated_file)}")]
-
-        case "get_file":
-            path = arguments["path"]
-
-            file_content = client.get_file(project_id=PROJECT_ID, path=path)
-            return [types.TextContent(type="text", text=str(file_content))]
-
-        case "delete_project_file":
-            path = arguments["path"]
-
-            deleted = client.delete_file(project_id=PROJECT_ID, file=path)
-            message = f"File deleted: {path}" if deleted else f"Failed to delete file: {path}"
-            return [types.TextContent(type="text", text=message)]
-
-        case "list_files":
-            files = client.list_files(project_id=PROJECT_ID, format=model.ListFilesFormat.TREE)
-            if isinstance(files, list):
-                file_list = "\n".join([file.path for file in files])
-                return [types.TextContent(type="text", text=f"Project files:\n{file_list}")]
-            return [types.TextContent(type="text", text=f"Project files:\n{files}")]
+        case bash_tool.name:
+            result = await bash_tool(**arguments)
+            if result.error:
+                result_text = _maybe_prepend_system_tool_result(result, result.error)
+                raise ToolError(result_text)
+            result_text = _maybe_prepend_system_tool_result(result, result.output or "")
+            return [types.TextContent(type="text", text=result_text)]
 
         case _:
             raise ValueError(f"Unknown tool: {name}")
+
+
+def _maybe_prepend_system_tool_result(result: ToolResult, result_text: str):
+    if result.system:
+        result_text = f"<system>{result.system}</system>\n{result_text}"
+    return result_text
+
 
 async def main():
     # Import here to avoid issues with event loops
