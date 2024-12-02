@@ -6,44 +6,13 @@ A MCP server for Hide
 
 ### Tools
 
-The server implements several tools for interacting with Hide projects:
+The server implements two tools adapted from [Anthropic's computer-use-demo](https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo/computer_use_demo/tools):
 
-- list_tasks: Lists available tasks in the project
-  - Takes no arguments
-  - Returns list of tasks with their aliases and commands
+#### String Replace Editor
+For viewing and editing files. Features file viewing with line numbers, directory listing, file creation, string replacement with exact matching, line insertion, and edit history. 
 
-- run_task: Executes a task in the project
-  - Takes either "command" or "alias" as required string argument
-  - Optional "timeout" integer argument in seconds
-  - Returns task execution results including exit code, stdout and stderr
-
-- create_file: Creates a new file in the project
-  - Takes "path" and "content" as required string arguments
-  - Returns details of created file
-
-- insert_lines: Inserts lines at a specific position in a file
-  - Takes "path", "start_line" (1-indexed), and "content" as required arguments
-  - Returns details of updated file
-
-- replace_lines: Replaces lines between start and end positions in a file
-  - Takes "path", "start_line", "end_line" (1-indexed), and "content" as required arguments
-  - Returns details of updated file
-
-- append_lines: Appends lines to end of a file
-  - Takes "path" and "content" as required string arguments
-  - Returns details of updated file
-
-- get_file: Reads contents of a file
-  - Takes "path" as required string argument
-  - Returns file contents
-
-- delete_file: Removes a file from the project
-  - Takes "path" as required string argument
-  - Returns deletion status
-
-- list_files: Lists all files in the project
-  - Takes no arguments
-  - Returns tree view of project files
+#### Bash
+A persistent bash shell with support for common Linux/Python packages, background processes and automatic output truncation. 
 
 ## Quickstart
 
