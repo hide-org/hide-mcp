@@ -43,24 +43,3 @@ async def run_proxy(remote_url: str):
         logger.error(f"Error in run_proxy: {e}")
         logger.error(f"Traceback: {''.join(traceback.format_tb(e.__traceback__))}")
         raise
-
-
-def main():
-    """Entry point for the proxy"""
-    import click
-
-    @click.command()
-    @click.argument("remote_url", default="http://localhost:8945/sse")
-    def cli(remote_url: str):
-        """
-        Run an MCP proxy that forwards stdio to a remote SSE server
-
-        REMOTE_URL: The URL of the remote SSE server
-        """
-        anyio.run(run_proxy, remote_url)
-
-    cli()
-
-
-if __name__ == "__main__":
-    main()

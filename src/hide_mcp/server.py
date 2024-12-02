@@ -6,6 +6,7 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from pydantic import AnyUrl
 
+from hide_mcp.sandbox import create_sandbox, setup_hide_mcp
 from hide_mcp.tools.base import ToolError, ToolResult
 from hide_mcp.tools.bash import BashTool
 from hide_mcp.tools.edit import EditTool
@@ -58,8 +59,9 @@ async def read_resource(uri: AnyUrl) -> str:
         raise ValueError(f"Unknown resource: {uri}")
 
     if project_id == "new":
-        # TODO: fill me in
-        PROJECT_URL = ""
+        sbx = create_sandbox()
+        url = setup_hide_mcp(sbx)
+        PROJECT_URL = url
         # Access the current request context
         ctx = server.request_context
         logger.info(f"Sending notification: tools/list_changed")

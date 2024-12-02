@@ -1,19 +1,72 @@
+import anyio
 import click
 import asyncio
-from . import server
-from .sse import starlette_app
+from dotenv import load_dotenv
 
-@click.command()
-@click.option('--transport', type=click.Choice(['stdio', 'sse']), default='stdio',
-              help='Transport type to use (stdio or sse)')
-@click.option('--port', default=8945, help='Port for SSE server (only used with sse transport)')
-def main(transport: str, port: int):
-    """Main entry point for the package."""
-    if transport == 'stdio':
-        asyncio.run(server.main())
+import uvicorn
+from .server import main as server_main
+from .sse import starlette_app
+from .proxy import run_proxy
+from .sandbox import create_sandbox, setup_hide_mcp
+
+@click.group()
+def main():
+    """
+    Main entry point for the MCP package.
+
+    Use subcommands to run different components.
+    """
+    pass
+
+
+@main.command()
+@click.option(
+    "--transport",
+    type=click.Choice(["stdio", "sse"]),
+    default="stdio",
+    help="Transport type to use (stdio or sse)",
+)
+@click.option(
+    "--port", default=8945, help="Port for SSE server (only used with sse transport)"
+)
+def server(transport: str, port: int):
+    """
+    Run the MCP server.
+    """
+    load_dotenv()
+    if transport == "stdio":
+        asyncio.run(server_main())
     else:  # sse
-        import uvicorn
         uvicorn.run(starlette_app, host="0.0.0.0", port=port)
 
-# Optionally expose other important items at package level
-__all__ = ['main', 'server']
+
+@main.command()
+@click.argument("remote_url", default="http://localhost:8945/sse")
+def proxy(remote_url: str):
+    """
+    Run an MCP proxy that forwards stdio to a remote SSE server.
+
+    REMOTE_URL: The URL of the remote SSE server.
+    """
+    load_dotenv()
+    anyio.run(run_proxy, remote_url)
+
+
+@main.command()
+@click.option(
+    '--timeout',
+    default=3600,
+    show_default=True,
+    type=int,
+    help='Sandbox timeout in seconds.'
+)
+def sandbox(timeout: int) -> None:
+    """
+    Spin up a new sandbox with hide-mcp sse server.
+    """
+    load_dotenv()
+    sbx = create_sandbox(timeout=timeout)
+    try:
+        setup_hide_mcp(sbx)
+    except Exception:
+        click.echo("Failed to set up the sandbox.", err=True)
