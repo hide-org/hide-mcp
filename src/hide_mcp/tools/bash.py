@@ -1,5 +1,6 @@
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from .base import BaseAnthropicTool, CLIResult, ToolError, ToolResult
@@ -33,7 +34,7 @@ class _BashSession:
     async def start(self):
         if self._started:
             return
-        
+
         # Remove VIRTUAL_ENV added by uv
         env = dict(os.environ)
         env.pop("VIRTUAL_ENV", None)  # None as default in case it doesn't exist
@@ -51,6 +52,7 @@ class _BashSession:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            cwd=str(Path.home()),
             env=env,
         )
 
@@ -96,7 +98,9 @@ class _BashSession:
                     await asyncio.sleep(self._output_delay)
                     # if we read directly from stdout/stderr, it will wait forever for
                     # EOF. use the StreamReader buffer directly instead.
-                    output = self._process.stdout._buffer.decode()  # pyright: ignore[reportAttributeAccessIssue]
+                    output = (
+                        self._process.stdout._buffer.decode()  # pyright: ignore[reportAttributeAccessIssue]
+                    )
                     if self._sentinel in output:
                         # strip the sentinel and break
                         output = output[: output.index(self._sentinel)]
@@ -110,7 +114,9 @@ class _BashSession:
         if output.endswith("\n"):
             output = output[:-1]
 
-        error = self._process.stderr._buffer.decode()  # pyright: ignore[reportAttributeAccessIssue]
+        error = (
+            self._process.stderr._buffer.decode()  # pyright: ignore[reportAttributeAccessIssue]
+        )
         if error.endswith("\n"):
             error = error[:-1]
 
@@ -169,10 +175,7 @@ class BashTool(BaseAnthropicTool):
                         "type": "boolean",
                     },
                 },
-                "oneOf": [
-                    {"required": ["command"]},
-                    {"required": ["restart"]}
-                ],
+                "oneOf": [{"required": ["command"]}, {"required": ["restart"]}],
                 "type": "object",
-            }
+            },
         }
