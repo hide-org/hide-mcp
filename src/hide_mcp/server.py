@@ -115,20 +115,24 @@ def _maybe_prepend_system_tool_result(result: ToolResult, result_text: str):
     return result_text
 
 
+async def run_server(read_stream, write_stream):
+    """Run the MCP server with given streams."""
+    await server.run(
+        read_stream,
+        write_stream,
+        InitializationOptions(
+            server_name="hide-mcp",
+            server_version="0.1.0",
+            capabilities=server.get_capabilities(
+                notification_options=NotificationOptions(),
+                experimental_capabilities={},
+            ),
+        ),
+    )
+
 async def main():
     # Import here to avoid issues with event loops
     from mcp.server.stdio import stdio_server
 
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="hide-mcp",
-                server_version="0.1.0",
-                capabilities=server.get_capabilities(
-                    notification_options=NotificationOptions(),
-                    experimental_capabilities={},
-                ),
-            ),
-        )
+        await run_server(read_stream, write_stream)
