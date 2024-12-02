@@ -1,3 +1,6 @@
+import logging
+from mcp.client.session import ClientSession
+from mcp.client.sse import sse_client
 from mcp.server.models import InitializationOptions
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
@@ -7,6 +10,8 @@ from hide_mcp.tools.base import ToolError, ToolResult
 from hide_mcp.tools.bash import BashTool
 from hide_mcp.tools.edit import EditTool
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 # Store Hide client
 
 server = Server("hide-mcp")
@@ -15,43 +20,55 @@ edit_tool = EditTool()
 bash_tool = BashTool()
 
 # Project ID is set when a client reads resource
-PROJECT_ID = None
+PROJECT_URL = None
 
 
-# @server.list_resources()
-# async def handle_list_resources() -> list[types.Resource]:
-#     """
-#     List available Hide projects as resources.
-#     Each project is exposed as a resource with a hide:// URI scheme.
-#     """
-#     resources = []
-#     for project in client.get_projects():
-#         resources.append(
-#             types.Resource(
-#                 uri=AnyUrl(f"hide://projects/{project.id}"),
-#                 name=f"{project.id} ({project.repository.url})",
-#                 description=f"Hide project from {project.repository.url}",
-#                 # mimeType="application/x-hide-project",
-#             )
-#         )
-#     return resources
+@server.list_resources()
+async def handle_list_resources() -> list[types.Resource]:
+    """
+    List available Hide projects as resources.
+    Each project is exposed as a resource with a hide:// URI scheme.
+    """
+    resources = []
+    # for project in client.get_projects():
+    #     resources.append(
+    #         types.Resource(
+    #             uri=AnyUrl(f"hide://projects/{project.id}"),
+    #             name=f"{project.id} ({project.repository.url})",
+    #             description=f"Hide project from {project.repository.url}",
+    #             # mimeType="application/x-hide-project",
+    #         )
+    #     )
+    resources.append(
+        types.Resource(
+            uri=AnyUrl("hide://projects/new"),
+            name="New Hide Project",
+        )
+    )
+    return resources
 
 
-# @server.read_resource()
-# async def read_resource(uri: AnyUrl) -> str:
-#     """Read a Hide project."""
-#     global PROJECT_ID
-#     if str(uri).startswith("hide://projects/"):
-#         project_id = str(uri).split("/")[-1]
-#     else:
-#         raise ValueError(f"Unknown resource: {uri}")
-#
-#     try:
-#         project = client.get_project(project_id)
-#         PROJECT_ID = project_id
-#         return f"This project is powered by Hide, a headless IDE for coding agents. Docs at hide.sh.\n\nProject: {project.id}\nRepository: {project.repository.url}"
-#     except Exception as e:
-#         raise RuntimeError(f"Error reading project: {str(e)}")
+@server.read_resource()
+async def read_resource(uri: AnyUrl) -> str:
+    """Read a Hide project."""
+    global PROJECT_URL
+    if str(uri).startswith("hide://projects/"):
+        project_id = str(uri).split("/")[-1]
+    else:
+        raise ValueError(f"Unknown resource: {uri}")
+
+    if project_id == "new":
+        # TODO: fill me in
+        PROJECT_URL = ""
+        # Access the current request context
+        ctx = server.request_context
+        logger.info(f"Sending notification: tools/list_changed")
+        await ctx.session.send_notification(
+            types.ToolListChangedNotification(method="notifications/tools/list_changed")
+        )
+        return "New project"
+    else:
+        return f"Project {project_id}"
 
 
 @server.list_tools()
@@ -80,8 +97,34 @@ async def handle_call_tool(
     """
     Handle tool execution requests for Hide operations.
     """
-    # if not PROJECT_ID:
-    #     raise ValueError("No project ID set. Please select a project resource first.")
+    global PROJECT_URL
+
+    if PROJECT_URL:
+        async with sse_client(PROJECT_URL) as streams:
+            async with ClientSession(streams[0], streams[1]) as session:
+                await session.initialize()
+
+                result = await session.call_tool(name, arguments)
+                if result.isError:
+                    if len(result.content) > 1:
+                        logger.warning(
+                            "Multiple contents returned in the tool error. Expected only one."
+                        )
+                    if not isinstance(result.content[0], types.TextContent):
+                        logger.warning(
+                            "Unexpected content type returned in the tool error. Expected only TextContent."
+                        )
+                    raise ToolError(
+                        ",".join(
+                            content.text
+                            for content in result.content
+                            if isinstance(content, types.TextContent)
+                        )
+                    )
+
+                return result.content
+
+    logger.warning("No project set. Running tool locally.")
 
     if not arguments:
         arguments = {}
@@ -127,6 +170,7 @@ async def run_server(read_stream, write_stream):
             ),
         ),
     )
+
 
 async def main():
     # Import here to avoid issues with event loops
