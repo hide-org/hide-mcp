@@ -47,24 +47,31 @@ def print_logs(handle: e2b.CommandHandle) -> None:
             click.echo(stderr, err=True)
 
 
-def setup_hide_mcp(sbx: e2b.Sandbox) -> str:
+def setup_hide_mcp(sbx: e2b.Sandbox, verbose: bool = False) -> str:
     try:
-        click.echo("Installing uv...")
+        if verbose:
+            click.echo("Installing uv...")
         run_cmd(sbx, "curl -LsSf https://astral.sh/uv/install.sh | sh")
 
-        click.echo("Cloning hide-mcp repository...")
+        if verbose:
+            click.echo("Cloning hide-mcp repository...")
         run_cmd(sbx, "git clone https://github.com/hide-org/hide-mcp.git")
 
-        click.echo("Running hide-mcp in background...")
+        if verbose:
+            click.echo("Running hide-mcp in background...")
         handle = run_background_cmd(
             sbx,
             "~/.local/bin/uv --directory ~/hide-mcp run hide-mcp server --transport sse",
         )
 
         url = f"https://{sbx.get_host(8945)}/sse"
-        click.echo(f"Hide MCP is running at: {url}")
+
+        if verbose:
+            click.echo(f"Hide MCP is running at: {url}")
         return url
     except Exception as e:
-        click.echo(f"Error setting up hide-mcp: {e}", err=True)
+        if verbose:
+            # TODO: replace with logger?
+            click.echo(f"Error setting up hide-mcp: {e}", err=True)
         kill_sandbox(sbx)
         raise

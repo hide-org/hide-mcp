@@ -9,6 +9,7 @@ from .sse import starlette_app
 from .proxy import run_proxy
 from .sandbox import create_sandbox, setup_hide_mcp
 
+
 @click.group()
 def main():
     """
@@ -54,11 +55,11 @@ def proxy(remote_url: str):
 
 @main.command()
 @click.option(
-    '--timeout',
+    "--timeout",
     default=3600,
     show_default=True,
     type=int,
-    help='Sandbox timeout in seconds.'
+    help="Sandbox timeout in seconds.",
 )
 def sandbox(timeout: int) -> None:
     """
@@ -67,6 +68,7 @@ def sandbox(timeout: int) -> None:
     load_dotenv()
     sbx = create_sandbox(timeout=timeout)
     try:
-        setup_hide_mcp(sbx)
+        setup_hide_mcp(sbx, verbose=True)
     except Exception:
         click.echo("Failed to set up the sandbox.", err=True)
+
