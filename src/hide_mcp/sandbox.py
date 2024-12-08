@@ -58,6 +58,10 @@ def setup_hide_mcp(sbx: e2b.Sandbox, verbose: bool = False) -> str:
         run_cmd(sbx, "git clone https://github.com/hide-org/hide-mcp.git")
 
         if verbose:
+            click.echo("Installing hide-mcp...")
+        run_cmd(sbx, "~/.local/bin/uv --directory ~/hide-mcp sync")
+
+        if verbose:
             click.echo("Running hide-mcp in background...")
         handle = run_background_cmd(
             sbx,
