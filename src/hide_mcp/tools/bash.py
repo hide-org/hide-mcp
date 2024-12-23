@@ -51,7 +51,7 @@ class _BashSession:
             bufsize=0,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
             cwd=str(Path.home()),
             env=env,
         )
@@ -83,7 +83,6 @@ class _BashSession:
         # we know these are not None because we created the process with PIPEs
         assert self._process.stdin
         assert self._process.stdout
-        assert self._process.stderr
 
         # send command to the process
         self._process.stdin.write(
@@ -114,17 +113,10 @@ class _BashSession:
         if output.endswith("\n"):
             output = output[:-1]
 
-        error = (
-            self._process.stderr._buffer.decode()  # pyright: ignore[reportAttributeAccessIssue]
-        )
-        if error.endswith("\n"):
-            error = error[:-1]
-
         # clear the buffers so that the next output can be read correctly
         self._process.stdout._buffer.clear()  # pyright: ignore[reportAttributeAccessIssue]
-        self._process.stderr._buffer.clear()  # pyright: ignore[reportAttributeAccessIssue]
 
-        return CLIResult(output=output, error=error)
+        return CLIResult(output=output)
 
 
 class BashTool(BaseAnthropicTool):
@@ -175,7 +167,6 @@ class BashTool(BaseAnthropicTool):
                         "type": "boolean",
                     },
                 },
-                "oneOf": [{"required": ["command"]}, {"required": ["restart"]}],
                 "type": "object",
             },
         }

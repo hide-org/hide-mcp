@@ -111,7 +111,7 @@ class EditTool(BaseAnthropicTool):
         elif command == "str_replace":
             if old_str is None:
                 raise ToolError(
-                    "Parameter `old_str` is required for command: str_replace"
+                    "Parameter `old_str` is required and cannot be empty for command: str_replace"
                 )
             return self.str_replace(_path, old_str, new_str)
         elif command == "insert":
@@ -143,7 +143,7 @@ class EditTool(BaseAnthropicTool):
             raise ToolError(
                 f"The path {path} does not exist. Please provide a valid path."
             )
-        if path.exists() and command == "create":
+        if path.exists() and not path.is_dir() and len(path.read_text().strip()) > 0 and command == "create":
             raise ToolError(
                 f"File already exists at: {path}. Cannot overwrite files using command `create`."
             )
@@ -205,28 +205,31 @@ class EditTool(BaseAnthropicTool):
         """Implement the str_replace command, which replaces old_str with new_str in the file content"""
         # Read the file content
         file_content = self.read_file(path).expandtabs()
-        old_str = old_str.expandtabs()
-        new_str = new_str.expandtabs() if new_str is not None else ""
+        if file_content == "" and new_str:
+            new_file_content = new_str
+        else:
+            old_str = old_str.expandtabs()
+            new_str = new_str.expandtabs() if new_str is not None else ""
 
-        # Check if old_str is unique in the file
-        occurrences = file_content.count(old_str)
-        if occurrences == 0:
-            raise ToolError(
-                f"No replacement was performed, old_str `{old_str}` did not appear verbatim in {path}."
-            )
-        elif occurrences > 1:
-            file_content_lines = file_content.split("\n")
-            lines = [
-                idx + 1
-                for idx, line in enumerate(file_content_lines)
-                if old_str in line
-            ]
-            raise ToolError(
-                f"No replacement was performed. Multiple occurrences of old_str `{old_str}` in lines {lines}. Please ensure it is unique"
-            )
+            # Check if old_str is unique in the file
+            occurrences = file_content.count(old_str)
+            if occurrences == 0:
+                raise ToolError(
+                    f"No replacement was performed, old_str `{old_str}` did not appear verbatim in {path}."
+                )
+            elif occurrences > 1:
+                file_content_lines = file_content.split("\n")
+                lines = [
+                    idx + 1
+                    for idx, line in enumerate(file_content_lines)
+                    if old_str in line
+                ]
+                raise ToolError(
+                    f"No replacement was performed. Multiple occurrences of old_str `{old_str}` in lines {lines}. Please ensure it is unique"
+                )
 
-        # Replace old_str with new_str
-        new_file_content = file_content.replace(old_str, new_str)
+            # Replace old_str with new_str
+            new_file_content = file_content.replace(old_str, new_str)
 
         # Write the new content to the file
         self.write_file(path, new_file_content)
@@ -235,7 +238,10 @@ class EditTool(BaseAnthropicTool):
         self._file_history[path].append(file_content)
 
         # Create a snippet of the edited section
-        replacement_line = file_content.split(old_str)[0].count("\n")
+        if old_str == "":
+            replacement_line = 0
+        else:
+            replacement_line = file_content.split(old_str)[0].count("\n")
         start_line = max(0, replacement_line - SNIPPET_LINES)
         end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
         snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
