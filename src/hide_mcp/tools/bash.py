@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from pathlib import Path
 from typing import Any, ClassVar, Literal
@@ -15,6 +16,8 @@ Run commands in a bash shell
 * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
 """
 
+logger = logging.getLogger(__name__)
+
 
 class _BashSession:
     """A session of a bash shell."""
@@ -29,7 +32,6 @@ class _BashSession:
 
     def __init__(self):
         self._started = False
-        self._timed_out = False
 
     async def start(self):
         if self._started:
@@ -62,23 +64,22 @@ class _BashSession:
         """Terminate the bash shell."""
         if not self._started:
             raise ToolError("Session has not started.")
-        if self._process.returncode is not None:
-            return
-        self._process.terminate()
+        if self._process.returncode is None:
+            self._process.terminate()
+        self._started = False
+
+    async def restart(self):
+        """Restart the bash shell."""
+        self.stop()
+        await self.start()
 
     async def run(self, command: str):
         """Execute a command in the bash shell."""
         if not self._started:
             raise ToolError("Session has not started.")
         if self._process.returncode is not None:
-            return ToolResult(
-                system="tool must be restarted",
-                error=f"bash has exited with returncode {self._process.returncode}",
-            )
-        if self._timed_out:
-            raise ToolError(
-                f"timed out: bash has not returned in {self._timeout} seconds and must be restarted",
-            )
+            logger.warning(f"bash has previously exited with returncode {self._process.returncode}, restarting")
+            await self.restart()
 
         # we know these are not None because we created the process with PIPEs
         assert self._process.stdin
@@ -105,9 +106,10 @@ class _BashSession:
                         output = output[: output.index(self._sentinel)]
                         break
         except asyncio.TimeoutError:
-            self._timed_out = True
+            await self.restart()
+
             raise ToolError(
-                f"timed out: bash has not returned in {self._timeout} seconds and must be restarted",
+                f"timed out: bash has not returned in {self._timeout} seconds and has been restarted",
             ) from None
 
         if output.endswith("\n"):
