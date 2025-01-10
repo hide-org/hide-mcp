@@ -30,34 +30,111 @@ class _BashSession:
     _timeout: float = 120.0  # seconds
     _sentinel: str = "<<exit>>"
 
+    @staticmethod
+    def _get_user_shell() -> tuple[str, str | None]:
+        """Get the user's default shell and its config file.
+        Returns a tuple of (shell_path, config_file_path)."""
+        import pwd
+        import shutil
+
+        # Get user's default shell from passwd database
+        shell = pwd.getpwuid(os.getuid()).pw_shell
+        home = str(Path.home())
+
+        # If shell path isn't available, fall back to bash
+        if not shell or not os.path.exists(shell):
+            shell = shutil.which('bash') or '/bin/bash'
+
+        # Map common shells to their config files
+        shell_configs = {
+            'bash': ['.bashrc', '.bash_profile'],
+            'zsh': ['.zshrc'],
+            'fish': ['config.fish']
+        }
+
+        # Determine which shell we're dealing with
+        shell_name = Path(shell).name
+        config_files = shell_configs.get(shell_name, [])
+
+        # Find the first existing config file
+        config_path = None
+        for config in config_files:
+            if shell_name == 'fish':
+                # Fish has a different config location
+                test_path = os.path.join(home, '.config', 'fish', config)
+            else:
+                test_path = os.path.join(home, config)
+            if os.path.exists(test_path):
+                config_path = test_path
+                break
+
+        return shell, config_path
+
     def __init__(self):
         self._started = False
+        # Get user's shell and config
+        self.command, self._config_path = self._get_user_shell()
+        logger.debug(f"Using shell: {self.command}, config: {self._config_path}")
 
     async def start(self):
         if self._started:
             return
 
-        # Remove VIRTUAL_ENV added by uv
-        env = dict(os.environ)
-        env.pop("VIRTUAL_ENV", None)  # None as default in case it doesn't exist
+        shell_name = Path(self.command).name
+        logger.debug(f"Starting shell: {self.command}")
 
-        # Remove the venv entry added by uv
-        path_parts = env["PATH"].split(":")
-        venv_free_path = ":".join(p for p in path_parts if ".venv" not in p)
-        env["PATH"] = venv_free_path
+        if shell_name == 'fish':
+            # Special handling for Fish shell
+            startup_commands = [
+                # Disable interactive features and command status
+                'function fish_prompt; echo ""; end',
+                'function fish_right_prompt; end',
+                'set -g fish_handle_reflow 0',
+                'set -g fish_greeting ""',
+            ]
 
-        self._process = await asyncio.create_subprocess_shell(
-            self.command,
-            preexec_fn=os.setsid,
-            shell=True,
-            bufsize=0,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=str(Path.home()),
-            env=env,
-        )
+            # Add config sourcing if available
+            if self._config_path:
+                logger.debug(f"Adding Fish config sourcing: {self._config_path}")
+                startup_commands.append(f'source {self._config_path}')
 
+            # Join all commands and create initialization script
+            init_script = '; '.join(startup_commands)
+            logger.debug(f"Fish init script: {init_script}")
+
+            # Start Fish in command mode (-c) with our initialization
+            self._process = await asyncio.create_subprocess_shell(
+                f"{self.command} -c '{init_script}; status --is-interactive; while read -l cmd; status --is-interactive; eval $cmd; end'",
+                preexec_fn=os.setsid,
+                shell=True,
+                bufsize=0,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=str(Path.home()),
+            )
+        else:
+            # Standard handling for bash/zsh
+            self._process = await asyncio.create_subprocess_shell(
+                self.command,
+                preexec_fn=os.setsid,
+                shell=True,
+                bufsize=0,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=str(Path.home()),
+            )
+
+            # Source config for bash/zsh
+            if self._config_path:
+                logger.debug(f"Sourcing config file: {self._config_path}")
+                result = await self.run(f". {self._config_path}")
+                logger.debug(f"Result of sourcing {self._config_path}: {result}")
+                if result.output:
+                    logger.warning(f"Output/errors while sourcing {self._config_path}:\n{result.output.strip()}")
+
+        logger.debug(f"Shell process started, return code: {self._process.returncode}")
         self._started = True
 
     def stop(self):
@@ -85,6 +162,7 @@ class _BashSession:
         assert self._process.stdin
         assert self._process.stdout
 
+        logger.debug(f"Running command: {command}")
         # send command to the process
         self._process.stdin.write(
             command.encode() + f"; echo '{self._sentinel}'\n".encode()
@@ -93,8 +171,10 @@ class _BashSession:
 
         # read output from the process, until the sentinel is found
         try:
+            logger.debug("Waiting for output...")
             async with asyncio.timeout(self._timeout):
                 while True:
+                    logger.debug("Checking for sentinel...")
                     await asyncio.sleep(self._output_delay)
                     # if we read directly from stdout/stderr, it will wait forever for
                     # EOF. use the StreamReader buffer directly instead.
@@ -102,10 +182,12 @@ class _BashSession:
                         self._process.stdout._buffer.decode()  # pyright: ignore[reportAttributeAccessIssue]
                     )
                     if self._sentinel in output:
+                        logger.debug("Sentinel found!")
                         # strip the sentinel and break
                         output = output[: output.index(self._sentinel)]
                         break
         except asyncio.TimeoutError:
+            logger.error("Timed out, restarting bash session")
             await self.restart()
 
             raise ToolError(
@@ -115,8 +197,11 @@ class _BashSession:
         if output.endswith("\n"):
             output = output[:-1]
 
+        logger.debug(f"Output: {output}")
+        logger.debug("Clearing buffers...")
         # clear the buffers so that the next output can be read correctly
         self._process.stdout._buffer.clear()  # pyright: ignore[reportAttributeAccessIssue]
+        logger.debug("Done!")
 
         return CLIResult(output=output)
 
@@ -138,6 +223,7 @@ class BashTool(BaseAnthropicTool):
         self, command: str | None = None, restart: bool = False, **kwargs
     ):
         if restart:
+            logger.debug("Restarting bash session")
             if self._session:
                 self._session.stop()
             self._session = _BashSession()
@@ -146,6 +232,7 @@ class BashTool(BaseAnthropicTool):
             return ToolResult(system="tool has been restarted.")
 
         if self._session is None:
+            logger.debug("Starting bash session")
             self._session = _BashSession()
             await self._session.start()
 
