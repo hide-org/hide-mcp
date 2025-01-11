@@ -24,3 +24,8 @@ hide-mcp = "hide_mcp:main"
 include = ["src"]
 venvPath = "."
 venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.11.1",
+]

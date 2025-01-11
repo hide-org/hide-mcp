@@ -4,10 +4,10 @@ import asyncio
 from dotenv import load_dotenv
 
 import uvicorn
-from .server import main as server_main
-from .sse import starlette_app
-from .proxy import run_proxy
-from .sandbox import create_sandbox, setup_hide_mcp
+from hide_mcp.server import main as server_main
+from hide_mcp.sse import starlette_app
+from hide_mcp.proxy import run_proxy
+from hide_mcp.sandbox import create_sandbox, setup_hide_mcp
 
 
 @click.group()
@@ -72,3 +72,6 @@ def sandbox(timeout: int) -> None:
     except Exception:
         click.echo("Failed to set up the sandbox.", err=True)
 
+
+if __name__ == "__main__":
+    main()
