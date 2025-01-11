@@ -2,7 +2,7 @@ from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.routing import Route
 
-from . import server
+from hide_mcp import server
 
 sse = SseServerTransport("/messages")
 
