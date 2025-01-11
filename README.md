@@ -8,7 +8,7 @@ A MCP server for Hide
 
 The server implements two tools adapted from [Anthropic's computer-use-demo](https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo/computer_use_demo/tools):
 
-#### String Replace Editor
+#### Text Editor
 For viewing and editing files. Features file viewing with line numbers, directory listing, file creation, string replacement with exact matching, line insertion, and edit history. 
 
 #### Bash
