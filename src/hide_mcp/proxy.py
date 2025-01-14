@@ -5,8 +5,11 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 import mcp.types as types
 from mcp.client.sse import sse_client
 from mcp.server.stdio import stdio_server
+from hide_mcp.logging_utils import setup_logging
 
-logging.basicConfig(level=logging.INFO)
+# Logging will be configured by server.py, but in case this module is run directly:
+if not logging.getLogger().handlers:
+    setup_logging()
 logger = logging.getLogger("mcp-proxy")
 
 

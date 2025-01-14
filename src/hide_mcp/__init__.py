@@ -34,7 +34,6 @@ def server(transport: str, port: int):
     """
     Run the MCP server.
     """
-    load_dotenv()
     if transport == "stdio":
         asyncio.run(server_main())
     else:  # sse

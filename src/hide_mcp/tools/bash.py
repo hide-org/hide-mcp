@@ -43,13 +43,13 @@ class _BashSession:
 
         # If shell path isn't available, fall back to bash
         if not shell or not os.path.exists(shell):
-            shell = shutil.which('bash') or '/bin/bash'
+            shell = shutil.which("bash") or "/bin/bash"
 
         # Map common shells to their config files
         shell_configs = {
-            'bash': ['.bashrc', '.bash_profile'],
-            'zsh': ['.zshrc'],
-            'fish': ['config.fish']
+            "bash": [".bashrc", ".bash_profile"],
+            "zsh": [".zshrc"],
+            "fish": ["config.fish"],
         }
 
         # Determine which shell we're dealing with
@@ -59,9 +59,9 @@ class _BashSession:
         # Find the first existing config file
         config_path = None
         for config in config_files:
-            if shell_name == 'fish':
+            if shell_name == "fish":
                 # Fish has a different config location
-                test_path = os.path.join(home, '.config', 'fish', config)
+                test_path = os.path.join(home, ".config", "fish", config)
             else:
                 test_path = os.path.join(home, config)
             if os.path.exists(test_path):
@@ -83,23 +83,23 @@ class _BashSession:
         shell_name = Path(self.command).name
         logger.debug(f"Starting shell: {self.command}")
 
-        if shell_name == 'fish':
+        if shell_name == "fish":
             # Special handling for Fish shell
             startup_commands = [
                 # Disable interactive features and command status
                 'function fish_prompt; echo ""; end',
-                'function fish_right_prompt; end',
-                'set -g fish_handle_reflow 0',
+                "function fish_right_prompt; end",
+                "set -g fish_handle_reflow 0",
                 'set -g fish_greeting ""',
             ]
 
             # Add config sourcing if available
             if self._config_path:
                 logger.debug(f"Adding Fish config sourcing: {self._config_path}")
-                startup_commands.append(f'source {self._config_path}')
+                startup_commands.append(f"source {self._config_path}")
 
             # Join all commands and create initialization script
-            init_script = '; '.join(startup_commands)
+            init_script = "; ".join(startup_commands)
             logger.debug(f"Fish init script: {init_script}")
 
             # Start Fish in command mode (-c) with our initialization
@@ -129,10 +129,13 @@ class _BashSession:
             # Source config for bash/zsh
             if self._config_path:
                 logger.debug(f"Sourcing config file: {self._config_path}")
+                # TODO: it's a bug because self._started is not true yet
                 result = await self.run(f". {self._config_path}")
                 logger.debug(f"Result of sourcing {self._config_path}: {result}")
                 if result.output:
-                    logger.warning(f"Output/errors while sourcing {self._config_path}:\n{result.output.strip()}")
+                    logger.warning(
+                        f"Output/errors while sourcing {self._config_path}:\n{result.output.strip()}"
+                    )
 
         logger.debug(f"Shell process started, return code: {self._process.returncode}")
         self._started = True
@@ -155,7 +158,9 @@ class _BashSession:
         if not self._started:
             raise ToolError("Session has not started.")
         if self._process.returncode is not None:
-            logger.warning(f"bash has previously exited with returncode {self._process.returncode}, restarting")
+            logger.warning(
+                f"bash has previously exited with returncode {self._process.returncode}, restarting"
+            )
             await self.restart()
 
         # we know these are not None because we created the process with PIPEs

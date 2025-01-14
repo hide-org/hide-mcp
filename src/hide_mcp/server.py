@@ -1,6 +1,8 @@
 import logging
+from dotenv import load_dotenv
 from mcp.client.session import ClientSession
 from mcp.client.sse import sse_client
+from hide_mcp.logging_utils import setup_logging
 from mcp.server.models import InitializationOptions
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
@@ -11,8 +13,10 @@ from hide_mcp.tools.base import ToolError, ToolResult
 from hide_mcp.tools.bash import BashTool
 from hide_mcp.tools.edit import EditTool
 
+# Setup logging
+load_dotenv()
+setup_logging()
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 # Store Hide client
 
 server = Server("hide-mcp")
