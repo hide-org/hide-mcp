@@ -113,6 +113,12 @@ class _BashSession:
                 stderr=asyncio.subprocess.STDOUT,
                 cwd=str(Path.home()),
             )
+
+            # Mark as started right after process creation
+            self._started = True
+            logger.debug(
+                f"Shell process started, return code: {self._process.returncode}"
+            )
         else:
             # Standard handling for bash/zsh
             self._process = await asyncio.create_subprocess_shell(
@@ -126,19 +132,21 @@ class _BashSession:
                 cwd=str(Path.home()),
             )
 
+            # Mark as started right after process creation but before config sourcing
+            self._started = True
+            logger.debug(
+                f"Shell process started, return code: {self._process.returncode}"
+            )
+
             # Source config for bash/zsh
             if self._config_path:
                 logger.debug(f"Sourcing config file: {self._config_path}")
-                # TODO: it's a bug because self._started is not true yet
                 result = await self.run(f". {self._config_path}")
                 logger.debug(f"Result of sourcing {self._config_path}: {result}")
                 if result.output:
                     logger.warning(
                         f"Output/errors while sourcing {self._config_path}:\n{result.output.strip()}"
                     )
-
-        logger.debug(f"Shell process started, return code: {self._process.returncode}")
-        self._started = True
 
     def stop(self):
         """Terminate the bash shell."""
