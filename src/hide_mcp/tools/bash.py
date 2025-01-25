@@ -126,6 +126,7 @@ class _BashSession:
                 preexec_fn=os.setsid,
                 shell=True,
                 bufsize=0,
+                limit=65536 * 8,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
