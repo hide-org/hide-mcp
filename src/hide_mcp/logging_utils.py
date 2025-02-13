@@ -68,5 +68,4 @@ def setup_logging(level=None):
     root_logger.addHandler(console_handler)
 
     # Log startup message
-    root_logger.info(f"Logging initialized. Log file: {log_file}")
-
+    root_logger.info(f"Logging initialized. Log level: {level}. Log file: {log_file}")
