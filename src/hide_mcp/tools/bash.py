@@ -31,14 +31,14 @@ class _BashSession:
     _sentinel: str = "<<exit>>"
 
     @staticmethod
-    def _get_user_shell() -> tuple[str, str | None]:
+    def _get_user_shell() -> tuple[str, list[str]]:
         """Get the user's default shell and its config file.
         Returns a tuple of (shell_path, config_file_path)."""
         import pwd
         import shutil
 
         # Get user's default shell from passwd database
-        shell = pwd.getpwuid(os.getuid()).pw_shell
+        shell = os.getenv("HIDE_SHELL", pwd.getpwuid(os.getuid()).pw_shell)
         home = str(Path.home())
 
         # If shell path isn't available, fall back to bash
@@ -47,9 +47,8 @@ class _BashSession:
 
         # Map common shells to their config files
         shell_configs = {
-            "bash": [".bashrc", ".bash_profile"],
-            "zsh": [".zshrc"],
-            "fish": ["config.fish"],
+            "bash": [".bash_profile", ".bashrc"],
+            "zsh": [".zprofile", ".zshrc"],
         }
 
         # Determine which shell we're dealing with
@@ -57,97 +56,52 @@ class _BashSession:
         config_files = shell_configs.get(shell_name, [])
 
         # Find the first existing config file
-        config_path = None
+        configs = []
         for config in config_files:
-            if shell_name == "fish":
-                # Fish has a different config location
-                test_path = os.path.join(home, ".config", "fish", config)
-            else:
-                test_path = os.path.join(home, config)
+            test_path = os.path.join(home, config)
             if os.path.exists(test_path):
-                config_path = test_path
-                break
+                configs.append(test_path)
 
-        return shell, config_path
+        return shell, configs
 
     def __init__(self):
         self._started = False
         # Get user's shell and config
-        self.command, self._config_path = self._get_user_shell()
-        logger.debug(f"Using shell: {self.command}, config: {self._config_path}")
+        self.command, self._configs = self._get_user_shell()
+        logger.debug(f"Using shell: {self.command}, configs: {self._configs}")
 
     async def start(self):
         if self._started:
             return
 
-        shell_name = Path(self.command).name
         logger.debug(f"Starting shell: {self.command}")
 
-        if shell_name == "fish":
-            # Special handling for Fish shell
-            startup_commands = [
-                # Disable interactive features and command status
-                'function fish_prompt; echo ""; end',
-                "function fish_right_prompt; end",
-                "set -g fish_handle_reflow 0",
-                'set -g fish_greeting ""',
-            ]
+        # Standard handling for bash/zsh
+        self._process = await asyncio.create_subprocess_shell(
+            self.command,
+            preexec_fn=os.setsid,
+            shell=True,
+            bufsize=0,
+            limit=65536 * 8,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=str(Path.home()),
+        )
 
-            # Add config sourcing if available
-            if self._config_path:
-                logger.debug(f"Adding Fish config sourcing: {self._config_path}")
-                startup_commands.append(f"source {self._config_path}")
+        # Mark as started right after process creation but before config sourcing
+        self._started = True
+        logger.debug(f"Shell process started, return code: {self._process.returncode}")
 
-            # Join all commands and create initialization script
-            init_script = "; ".join(startup_commands)
-            logger.debug(f"Fish init script: {init_script}")
-
-            # Start Fish in command mode (-c) with our initialization
-            self._process = await asyncio.create_subprocess_shell(
-                f"{self.command} -c '{init_script}; status --is-interactive; while read -l cmd; status --is-interactive; eval $cmd; end'",
-                preexec_fn=os.setsid,
-                shell=True,
-                bufsize=0,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                cwd=str(Path.home()),
-            )
-
-            # Mark as started right after process creation
-            self._started = True
-            logger.debug(
-                f"Shell process started, return code: {self._process.returncode}"
-            )
-        else:
-            # Standard handling for bash/zsh
-            self._process = await asyncio.create_subprocess_shell(
-                self.command,
-                preexec_fn=os.setsid,
-                shell=True,
-                bufsize=0,
-                limit=65536 * 8,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                cwd=str(Path.home()),
-            )
-
-            # Mark as started right after process creation but before config sourcing
-            self._started = True
-            logger.debug(
-                f"Shell process started, return code: {self._process.returncode}"
-            )
-
-            # Source config for bash/zsh
-            if self._config_path:
-                logger.debug(f"Sourcing config file: {self._config_path}")
-                result = await self.run(f". {self._config_path}")
-                logger.debug(f"Result of sourcing {self._config_path}: {result}")
-                if result.output:
-                    logger.warning(
-                        f"Output/errors while sourcing {self._config_path}:\n{result.output.strip()}"
-                    )
+        # Source config for bash/zsh
+        for config in self._configs:
+            logger.debug(f"Sourcing config file: {config}")
+            result = await self.run(f"source {config}")
+            logger.debug(f"Result of sourcing {config}: {result}")
+            if result.output:
+                logger.warning(
+                    f"Output/errors while sourcing {config}:\n{result.output.strip()}"
+                )
 
     def stop(self):
         """Terminate the bash shell."""

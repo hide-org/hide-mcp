@@ -69,9 +69,7 @@ async def read_resource(uri: AnyUrl) -> str:
         # Access the current request context
         ctx = server.request_context
         logger.info(f"Sending notification: tools/list_changed")
-        await ctx.session.send_notification(
-            types.ToolListChangedNotification(method="notifications/tools/list_changed")
-        )
+        await ctx.session.send_tool_list_changed()
         return "New project"
     else:
         return f"Project {project_id}"
