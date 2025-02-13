@@ -81,6 +81,16 @@ Note: You'll need to set PyPI credentials via environment variables or command f
 - Token: `--token` or `UV_PUBLISH_TOKEN`
 - Or username/password: `--username`/`UV_PUBLISH_USERNAME` and `--password`/`UV_PUBLISH_PASSWORD`
 
+### Packaging
+
+To package the service into a standalone executable:
+
+```bash
+uv run pyinstaller hide-mcp.spec
+```
+
+This will create a standalone executable in the `dist/` directory.
+
 ### Debugging
 
 Since MCP servers run over stdio, debugging can be challenging. For the best debugging
