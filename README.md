@@ -1,6 +1,6 @@
-# hide-mcp MCP server
+# Hide MCP server
 
-A MCP server for Hide
+A MCP server for Hide – headless IDE.
 
 ## Components
 
